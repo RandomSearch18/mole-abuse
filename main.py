@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pygame
 from pygame import Color
+from pygame.event import Event
 
+# We shouldn't need tgo provide object width beciase we can just do coordiantes relative to a corner and rersulver them in resolve()
 
 class Theme:
     """Colors used by the game, labeled according to their purpose
@@ -46,17 +48,17 @@ class PointSpecifier:
     def move_down(self, pixels: float):
         raise NotImplementedError()
 
-    def move_to(
-        self, absolute_coordinates: Tuple[float, float], width: float, height: float
-    ):
-        raise NotImplementedError()
+    def on_window_resize(self, event: Event):
+        """Responds to a window resize event to keeping the position within window bounds"""
+        pass
 
 
 class PixelsPoint(PointSpecifier):
-    def __init__(self, x: float, y: float, relative_to: Corner = Corner.TOP_LEFT):
+    def __init__(self, object: GameObject, x: float, y: float, relative_to: Corner = Corner.TOP_LEFT):
         self.x = x
         self.y = y
         self.relative_to = relative_to
+        self.object = object
 
     def resolve(
         self, game: Game, width: float = 0, height: float = 0
@@ -71,6 +73,7 @@ class PixelsPoint(PointSpecifier):
 
         # Calculate the number of pixels away from the corner that we should be at
         x_offset = -self.x if multiplier_x else +self.x
+        print(self.y, type(self.y))
         y_offset = -self.y if multiplier_y else +self.y
 
         # Account for the x/y offsets not always measuring from our top-left
@@ -131,12 +134,34 @@ class PixelsPoint(PointSpecifier):
 
         self.x, self.y = new_x, new_y
 
+    def on_window_resize(self, event):
+        old_center_point_bounds = self.object.calculate_center_bounds(
+            *event.old_dimensions
+        )
+        position_percentage = self.object.calculate_position_percentage(
+            old_center_point_bounds
+        )
+        print("Was at", position_percentage)
+    
+        # Update object's position to be the in the same place relative to the window size
+        new_center_point_bounds = self.object.calculate_center_bounds(event.w, event.h)
+        new_center = self.object.map_relative_position_to_box(
+            position_percentage, new_center_point_bounds
+        )
+        new_x = new_center[0] - self.object.width() / 2
+        new_y = new_center[1] - self.object.height() / 2
+
+        # FIXME Remove move_to and just update our x and y attributes
+        global game
+        self.move_to((new_x, new_y), game.width(), game.height())
+
 
 class PercentagePoint(PointSpecifier):
-    def __init__(self, x: float, y: float, relative_to: Corner = Corner.TOP_LEFT):
+    def __init__(self, object: GameObject, x: float, y: float, relative_to: Corner = Corner.TOP_LEFT):
         self.x = x
         self.y = y
         self.relative_to = relative_to
+        self.object = object
 
     def resolve(
         self, game: Game, width: float = 0, height: float = 0
@@ -145,9 +170,14 @@ class PercentagePoint(PointSpecifier):
         x_pixels = self.x * outer_box.width
         y_pixels = self.y * outer_box.height
 
-        pixels_point = PixelsPoint(x_pixels, y_pixels, self.relative_to)
+        pixels_point = PixelsPoint(self.object, x_pixels, y_pixels, self.relative_to)
         return pixels_point.resolve(game, width, height)
 
+    def on_window_resize(self, event):
+        # We don't need to do anything on window resize
+        # since the percentage positions will still be valid
+        pass
+        
 
 class Box:
     def __init__(self, x1: float, y1: float, x2: float, y2: float):
@@ -252,9 +282,7 @@ class Game:
         elif event.type == pygame.VIDEORESIZE:
             event.old_dimensions = self.old_window_dimensions
             for object in self.objects:
-                if not object.window_resize_handler:
-                    continue
-                object.window_resize_handler.handle_window_resize(event)
+                object.position.on_window_resize(event)
             self.old_window_dimensions = (self.width(), self.height())
 
         # Keyboard input
@@ -349,7 +377,7 @@ class Game:
     
     def game_session(self):
         self.fps_counter = FPSCounter(
-            game=self, spawn_point=PixelsPoint(0, 0, Corner.TOP_RIGHT)
+            game=self
         )
         self.objects.append(self.fps_counter)
 
@@ -612,10 +640,10 @@ class FPSCounter(GameObject):
         color = self.calculate_color(fps)
         return f"{fps:.0f} FPS", color
 
-    def __init__(self, game: Game, spawn_point: PointSpecifier):
+    def __init__(self, game: Game):
         self.game = game
         self.font = pygame.font.Font("freesansbold.ttf", 12)
-        self.spawn_point = lambda: spawn_point
+        self.spawn_point = lambda: PixelsPoint(object=self, x=0, y=0, relative_to=Corner.TOP_RIGHT)
         texture = TextTexture(game, self.get_content, self.font)
 
         super().__init__(texture=texture)
