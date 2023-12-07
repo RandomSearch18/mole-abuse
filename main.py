@@ -203,7 +203,7 @@ class Box:
         return is_outside_x or is_outside_y
 
 class Game:
-    def __init__(self):
+    def __init__(self, max_fps):
         # Window display config
         self.theme = Theme
         self.background_color = self.theme.BACKGROUND
@@ -213,7 +213,7 @@ class Game:
         pygame.display.set_caption("Mole Abuse")
 
         # Initialise other game components
-        self.MAX_FPS = 60
+        self.max_fps = max_fps
         self.clock = pygame.time.Clock()
         self.exited = False
         self.objects: list[GameObject] = []
@@ -294,12 +294,9 @@ class Game:
         return decorator
 
     def execute_after_delay(self, seconds: float, callback: Callable):
-        delay_ticks = seconds / self.MAX_FPS
+        delay_ticks = seconds / self.max_fps
         task = Task(delay_ticks, callback)
         self.queued_tasks.append(task)
-
-    def update_display(self):
-        pygame.display.update()
 
     def milliseconds_per_frame(self):
         """Returns average time taken to compute, render, and draw the last 10 frames"""
@@ -313,6 +310,43 @@ class Game:
         average = sum / len(times)
         return average
 
+    def execute_tick(self):
+        """Updates the states and positions of all game objects.
+
+        - One tick should happen every frame
+        - Runs the event handlers for any events emitted since the last tick
+        - Runs the tick tasks for each game object
+        - This is essentially the computational/"logical server" side of the game
+        """
+        for event in pygame.event.get():
+            self.on_event(event)
+
+        # Update the objects
+        if not self.is_paused:
+            for object in self.objects:
+                object.run_tick_tasks()
+        else:
+            # Always update the FPS counter
+            self.fps_counter.run_tick_tasks()
+
+    def draw_frame(self):
+        """Redraws the screen, ready for the display to be refreshed
+        
+        - This should happen every frame
+        - Should be called after objects have ticked but before the display is updated
+        - This is the graphical/"logical client" side of the game
+        """
+        # Clear the entire surface
+        self.surface.fill(self.background_color)
+
+        # Draw each object
+        for object in self.objects:
+            object.draw()
+        
+
+    def update_display(self):
+        pygame.display.update()
+    
     def game_session(self):
         self.fps_counter = FPSCounter(
             game=self, spawn_point=PixelsPoint(0, 0, Corner.TOP_RIGHT)
@@ -323,28 +357,12 @@ class Game:
         self.objects.append(self.current_mole)
         
         while not self.exited:
-            for event in pygame.event.get():
-                self.on_event(event)
-
-            # Update the objects
-            if not self.is_paused:
-                for object in self.objects:
-                    object.run_tick_tasks()
-            else:
-                # Always update the FPS counter
-                self.fps_counter.run_tick_tasks()
-
-            # Reset the surface
-            self.surface.fill(self.background_color)
-
-            # Draw the objects
-            for object in self.objects:
-                object.draw()
-
+            self.execute_tick()
+            self.draw_frame()
             self.update_display()
-            self.clock.tick(self.MAX_FPS)
-
+            
             self.recent_frame_times.append(self.clock.get_rawtime())
+            self.clock.tick(self.max_fps)
 
         self.objects.clear()
         self.key_action_callbacks.clear()
@@ -578,17 +596,14 @@ class LinearPositionScaling(WindowResizeHandler):
         return new_x, new_y
 
 class FPSCounter(GameObject):
-    def tick(self):
-        pass
-
     def draw(self):
         self.texture.draw_at(self.position)
 
     def calculate_color(self, fps: float) -> pygame.Color:
         color = self.game.theme
-        if fps < game.MAX_FPS / 2:
+        if fps < game.max_fps / 2:
             return color.RED
-        if math.floor(fps) < game.MAX_FPS:
+        if math.floor(fps) < game.max_fps:
             return color.YELLOW
         return color.FOREGROUND
 
@@ -605,6 +620,14 @@ class FPSCounter(GameObject):
 
         super().__init__(texture=texture)
 
+# class FrameTimeCounter(GameObject):
+#     def tick(self):
+#         pass
+
+#     def init(self):
+#         self.memorized_frame_time = None
+    
+
 class Mole(GameObject):
     def draw(self):
         self.texture.draw_at(self.position)
@@ -617,5 +640,5 @@ class Mole(GameObject):
         texture = ImageTexture(game=game, image=texture_image)
         super().__init__(texture=texture)
 
-game = Game()
+game = Game(max_fps=64)
 game.game_session()
