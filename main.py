@@ -1,11 +1,13 @@
 from __future__ import annotations
 from typing import Callable, Optional, Tuple
+from collections import deque
 from enum import Enum
 import math
 from pathlib import Path
 
 import pygame
 from pygame import Color
+
 
 class Theme:
     """Colors used by the game, labeled according to their purpose
@@ -219,6 +221,7 @@ class Game:
         self.key_action_callbacks = {}
         self.key_up_callbacks = {}
         self.is_paused = False
+        self.recent_frame_times = deque(maxlen=10)
 
         # Set up default keybinds
         self.keybinds = {}
@@ -298,6 +301,18 @@ class Game:
     def update_display(self):
         pygame.display.update()
 
+    def milliseconds_per_frame(self):
+        """Returns average time taken to compute, render, and draw the last 10 frames"""
+        times = self.recent_frame_times
+        if not len(times):
+            # Default to 0 if we haven't recorded any frame times yet
+            return 0
+        sum = 0
+        for time in times:
+            sum += time
+        average = sum / len(times)
+        return average
+
     def game_session(self):
         self.fps_counter = FPSCounter(
             game=self, spawn_point=PixelsPoint(0, 0, Corner.TOP_RIGHT)
@@ -329,8 +344,7 @@ class Game:
             self.update_display()
             self.clock.tick(self.MAX_FPS)
 
-            # miliseconds_per_frame = self.clock.get_rawtime()
-            # print(miliseconds_per_frame)
+            self.recent_frame_times.append(self.clock.get_rawtime())
 
         self.objects.clear()
         self.key_action_callbacks.clear()
