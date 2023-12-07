@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Callable, Optional, Tuple
 from enum import Enum
 import math
+from pathlib import Path
 
 import pygame
 from pygame import Color
@@ -302,6 +303,9 @@ class Game:
             game=self, spawn_point=PixelsPoint(0, 0, Corner.TOP_RIGHT)
         )
         self.objects.append(self.fps_counter)
+
+        self.current_mole = Mole(game=self, spawn_point=PercentagePoint(0.5, 0.5))
+        self.objects.append(self.current_mole)
         
         while not self.exited:
             for event in pygame.event.get():
@@ -585,6 +589,18 @@ class FPSCounter(GameObject):
         self.spawn_point = lambda: spawn_point
         texture = TextTexture(game, self.get_content, self.font)
 
+        super().__init__(texture=texture)
+
+class Mole(GameObject):
+    def draw(self):
+        self.texture.draw_at(self.position)
+    
+    def __init__(self, game: Game, spawn_point: PointSpecifier) -> None:
+        self.game = game
+        self.spawn_point = lambda: spawn_point
+        # Mole image adapted from the Mullvad VPN logo: https://mullvad.net/en/press
+        texture_image = pygame.image.load(Path("assets", "mole_64x.png"))
+        texture = ImageTexture(game=game, image=texture_image)
         super().__init__(texture=texture)
 
 game = Game()
