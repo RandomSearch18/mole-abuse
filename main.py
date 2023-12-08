@@ -278,11 +278,6 @@ class Game:
 
         return decorator
 
-    def execute_after_delay(self, seconds: float, callback: Callable):
-        delay_ticks = seconds / self.max_fps
-        task = Task(delay_ticks, callback)
-        self.queued_tasks.append(task)
-
     def milliseconds_per_frame(self):
         """Returns average time taken to compute, render, and draw the last 10 frames"""
         times = self.recent_frame_times
