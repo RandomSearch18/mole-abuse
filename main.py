@@ -49,8 +49,16 @@ class PointSpecifier:
         raise NotImplementedError()
 
     def on_window_resize(self, event: Event):
-        """Responds to a window resize event to keeping the position within window bounds"""
+        """Responds to a window resize event to keep the position within window bounds"""
         pass
+
+    def calculate_top_left(self, game: Game, object_width: float, object_height: float):
+        center_x, center_y = self.resolve(game)
+        offset_x = object_width / 2
+        offset_y = object_height / 2
+        top_left_x = center_x - offset_x
+        top_left_y = center_y - offset_y
+        return (top_left_x, top_left_y)
 
 
 class PixelsPoint(PointSpecifier):
@@ -61,7 +69,7 @@ class PixelsPoint(PointSpecifier):
         self.object = object
 
     def resolve(
-        self, game: Game, width: float = 0, height: float = 0
+        self, game: Game
     ) -> Tuple[float, float]:
         outer_width = game.window_box().width
         outer_height = game.window_box().height
@@ -73,12 +81,7 @@ class PixelsPoint(PointSpecifier):
 
         # Calculate the number of pixels away from the corner that we should be at
         x_offset = -self.x if multiplier_x else +self.x
-        print(self.y, type(self.y))
         y_offset = -self.y if multiplier_y else +self.y
-
-        # Account for the x/y offsets not always measuring from our top-left
-        x_offset -= width * multiplier_x
-        y_offset -= height * multiplier_y
 
         # Calculate the desired coordinates of the top-left of our object
         actual_x_coordinate = base_x_coordinate + x_offset
@@ -126,7 +129,7 @@ class PercentagePoint(PointSpecifier):
         y_pixels = self.y * outer_box.height
 
         pixels_point = PixelsPoint(x_pixels, y_pixels, self.relative_to)
-        return pixels_point.resolve(game, width, height)
+        return pixels_point.resolve(game)
 
     def on_window_resize(self, event):
         # We don't need to do anything on window resize
@@ -373,8 +376,8 @@ class PlainColorTexture(Texture):
         self.color = color
         super().__init__(width, height)
 
-    def draw_at(self, top_left):
-        x1, y1 = top_left.resolve(self.game, self.width(), self.height())
+    def draw_at(self, position: PointSpecifier):
+        x1, y1 = position.calculate_top_left(self.game, self.width(), self.height())
 
         pygame.draw.rect(
             self.game.surface,
@@ -422,8 +425,8 @@ class TextTexture(Texture):
         self.current_rect = self.render_text(0, 0)[1]
         super().__init__(self.width(), self.height())
 
-    def draw_at(self, top_left: PointSpecifier):
-        start_x, start_y = top_left.resolve(self.game, self.width(), self.height())
+    def draw_at(self, position: PointSpecifier):
+        start_x, start_y = position.calculate_top_left(self.game, self.width(), self.height())
         text_surface, text_rect = self.render_text(start_x, start_y)
         self.current_rect = text_rect
         self.game.surface.blit(text_surface, text_rect)
@@ -438,8 +441,8 @@ class ImageTexture(Texture):
         height = self.image.get_height()
         super().__init__(width, height)
 
-    def draw_at(self, top_left: PointSpecifier):
-        start_x, start_y = top_left.resolve(self.game, self.width(), self.height())
+    def draw_at(self, position: PointSpecifier):
+        start_x, start_y = position.calculate_top_left(self.game, self.width(), self.height())
         self.game.surface.blit(self.image, (start_x, start_y))
 
 
@@ -457,7 +460,6 @@ class GameObject:
         """Moves the object to its initial position (spawn point)"""
         spawn_point = self.spawn_point()
         self.position = spawn_point
-        # self.x, self.y = spawn_point.resolve(self.game, self.width(), self.height())
 
     def __init__(
         self,
@@ -493,7 +495,7 @@ class GameObject:
 
     def collision_box(self) -> Box:
         """Calculates the visual bounding box (i.e. collision box) for this object"""
-        x1, y1 = self.position.resolve(self.game, self.width(), self.height())
+        x1, y1 = self.position.calculate_top_left(self.game, self.width(), self.height())
         x2 = x1 + self.width()
         y2 = y1 + self.height()
 
@@ -540,6 +542,7 @@ class GameObject:
 
 class FPSCounter(GameObject):
     def draw(self):
+        print(self.position.resolve(self.game), self.position.calculate_top_left(self.game, self.width(), self.height()))
         self.texture.draw_at(self.position)
 
     def calculate_color(self, fps: float) -> pygame.Color:
