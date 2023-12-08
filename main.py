@@ -9,14 +9,14 @@ import pygame
 from pygame import Color
 from pygame.event import Event
 
-# We shouldn't need tgo provide object width beciase we can just do coordiantes relative to a corner and rersulver them in resolve()
 
 class Theme:
     """Colors used by the game, labeled according to their purpose
-    
+
     - Based on Dracula theme
     - See https://draculatheme.com/contribute#color-palette
     """
+
     BACKGROUND = Color("#282A36")
     FOREGROUND = Color("#F8F8F2")
     RED = Color("#FF5555")
@@ -68,9 +68,7 @@ class PixelsPoint(PointSpecifier):
         self.relative_to = relative_to
         self.object = object
 
-    def resolve(
-        self, game: Game
-    ) -> Tuple[float, float]:
+    def resolve(self, game: Game) -> Tuple[float, float]:
         outer_width = game.window_box().width
         outer_height = game.window_box().height
         multiplier_x, multiplier_y = self.relative_to.value
@@ -135,7 +133,7 @@ class PercentagePoint(PointSpecifier):
         # We don't need to do anything on window resize
         # since the percentage positions will still be valid
         pass
-        
+
 
 class Box:
     def __init__(self, x1: float, y1: float, x2: float, y2: float):
@@ -189,6 +187,7 @@ class Box:
         is_outside_y = self.bottom < other_box.top or self.top > other_box.bottom
 
         return is_outside_x or is_outside_y
+
 
 class Game:
     def __init__(self, max_fps):
@@ -317,7 +316,7 @@ class Game:
 
     def draw_frame(self):
         """Redraws the screen, ready for the display to be refreshed
-        
+
         - This should happen every frame
         - Should be called after objects have ticked but before the display is updated
         - This is the graphical/"logical client" side of the game
@@ -328,25 +327,22 @@ class Game:
         # Draw each object
         for object in self.objects:
             object.draw()
-        
 
     def update_display(self):
         pygame.display.update()
-    
+
     def game_session(self):
-        self.fps_counter = FPSCounter(
-            game=self
-        )
+        self.fps_counter = FPSCounter(game=self)
         self.objects.append(self.fps_counter)
 
         self.current_mole = Mole(game=self, spawn_point=PercentagePoint(0.5, 0.5))
         self.objects.append(self.current_mole)
-        
+
         while not self.exited:
             self.execute_tick()
             self.draw_frame()
             self.update_display()
-            
+
             self.recent_frame_times.append(self.clock.get_rawtime())
             self.clock.tick(self.max_fps)
 
@@ -426,7 +422,9 @@ class TextTexture(Texture):
         super().__init__(self.width(), self.height())
 
     def draw_at(self, position: PointSpecifier):
-        start_x, start_y = position.calculate_top_left(self.game, self.width(), self.height())
+        start_x, start_y = position.calculate_top_left(
+            self.game, self.width(), self.height()
+        )
         text_surface, text_rect = self.render_text(start_x, start_y)
         self.current_rect = text_rect
         self.game.surface.blit(text_surface, text_rect)
@@ -442,7 +440,9 @@ class ImageTexture(Texture):
         super().__init__(width, height)
 
     def draw_at(self, position: PointSpecifier):
-        start_x, start_y = position.calculate_top_left(self.game, self.width(), self.height())
+        start_x, start_y = position.calculate_top_left(
+            self.game, self.width(), self.height()
+        )
         self.game.surface.blit(self.image, (start_x, start_y))
 
 
@@ -495,7 +495,9 @@ class GameObject:
 
     def collision_box(self) -> Box:
         """Calculates the visual bounding box (i.e. collision box) for this object"""
-        x1, y1 = self.position.calculate_top_left(self.game, self.width(), self.height())
+        x1, y1 = self.position.calculate_top_left(
+            self.game, self.width(), self.height()
+        )
         x2 = x1 + self.width()
         y2 = y1 + self.height()
 
@@ -542,7 +544,10 @@ class GameObject:
 
 class FPSCounter(GameObject):
     def draw(self):
-        print(self.position.resolve(self.game), self.position.calculate_top_left(self.game, self.width(), self.height()))
+        print(
+            self.position.resolve(self.game),
+            self.position.calculate_top_left(self.game, self.width(), self.height()),
+        )
         self.texture.draw_at(self.position)
 
     def calculate_color(self, fps: float) -> pygame.Color:
@@ -566,18 +571,19 @@ class FPSCounter(GameObject):
 
         super().__init__(texture=texture)
 
+
 # class FrameTimeCounter(GameObject):
 #     def tick(self):
 #         pass
 
 #     def init(self):
 #         self.memorized_frame_time = None
-    
+
 
 class Mole(GameObject):
     def draw(self):
         self.texture.draw_at(self.position)
-    
+
     def __init__(self, game: Game, spawn_point: PointSpecifier) -> None:
         self.game = game
         self.spawn_point = lambda: spawn_point
@@ -586,5 +592,7 @@ class Mole(GameObject):
         texture = ImageTexture(game=game, image=texture_image)
         super().__init__(texture=texture)
 
-game = Game(max_fps=64)
+
+# Starts a session of the game in a window running at 60 fps
+game = Game(max_fps=60)
 game.game_session()
