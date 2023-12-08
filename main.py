@@ -54,7 +54,7 @@ class PointSpecifier:
 
 
 class PixelsPoint(PointSpecifier):
-    def __init__(self, object: GameObject, x: float, y: float, relative_to: Corner = Corner.TOP_LEFT):
+    def __init__(self, x: float, y: float, relative_to: Corner = Corner.TOP_LEFT):
         self.x = x
         self.y = y
         self.relative_to = relative_to
@@ -107,57 +107,12 @@ class PixelsPoint(PointSpecifier):
         pixel_movement = +pixels if y_corner else -pixels
         self.y += pixel_movement
 
-    def move_to(
-        self, target_coordinates: Tuple[float, float], width: float, height: float
-    ):
-        target_x, target_y = target_coordinates
-        outer_width = width
-        outer_height = height
-        multiplier_x, multiplier_y = self.relative_to.value
-
-        # Coordinates of the window corner that we're working relative to
-        base_x_coordinate = multiplier_x * outer_width
-        base_y_coordinate = multiplier_y * outer_height
-
-        # Calculate the number of pixels away from the corner that we should be at
-        x_difference = target_x - base_x_coordinate
-        y_difference = target_y - base_y_coordinate
-
-        # The differences should be measured from the corresponding corner of our object,
-        # e.g. from object.top_right to window.top_right
-        x_difference += width * multiplier_x
-        y_difference += height * multiplier_y
-
-        # Coordinates should be in the direction away from the outer box's chosen corner
-        new_x = -x_difference if multiplier_x else +x_difference
-        new_y = -y_difference if multiplier_y else +y_difference
-
-        self.x, self.y = new_x, new_y
-
     def on_window_resize(self, event):
-        old_center_point_bounds = self.object.calculate_center_bounds(
-            *event.old_dimensions
-        )
-        position_percentage = self.object.calculate_position_percentage(
-            old_center_point_bounds
-        )
-        print("Was at", position_percentage)
-    
-        # Update object's position to be the in the same place relative to the window size
-        new_center_point_bounds = self.object.calculate_center_bounds(event.w, event.h)
-        new_center = self.object.map_relative_position_to_box(
-            position_percentage, new_center_point_bounds
-        )
-        new_x = new_center[0] - self.object.width() / 2
-        new_y = new_center[1] - self.object.height() / 2
-
-        # FIXME Remove move_to and just update our x and y attributes
-        global game
-        self.move_to((new_x, new_y), game.width(), game.height())
+        pass
 
 
 class PercentagePoint(PointSpecifier):
-    def __init__(self, object: GameObject, x: float, y: float, relative_to: Corner = Corner.TOP_LEFT):
+    def __init__(self, x: float, y: float, relative_to: Corner = Corner.TOP_LEFT):
         self.x = x
         self.y = y
         self.relative_to = relative_to
@@ -170,7 +125,7 @@ class PercentagePoint(PointSpecifier):
         x_pixels = self.x * outer_box.width
         y_pixels = self.y * outer_box.height
 
-        pixels_point = PixelsPoint(self.object, x_pixels, y_pixels, self.relative_to)
+        pixels_point = PixelsPoint(x_pixels, y_pixels, self.relative_to)
         return pixels_point.resolve(game, width, height)
 
     def on_window_resize(self, event):
@@ -507,7 +462,6 @@ class GameObject:
     def __init__(
         self,
         texture: Texture,
-        window_resize_handler: Optional[WindowResizeHandler] = None,
         solid=True,
     ):
         assert hasattr(self, "game")
@@ -515,7 +469,6 @@ class GameObject:
         self.game: Game = self.game
         self.tick_tasks: list[Callable] = []
         self.texture = texture
-        self.window_resize_handler = window_resize_handler
         self.is_solid = solid
         self.reset()
 
@@ -585,44 +538,6 @@ class GameObject:
         return self.position.resolve(self.game, self.width(), self.height())
 
 
-class WindowResizeHandler:
-    def __init__(self, game_object: GameObject):
-        self.object = game_object
-
-    def get_new_position(self, event) -> Tuple[float, float]:
-        raise NotImplementedError()
-
-    def handle_window_resize(self, event):
-        new_position = self.get_new_position(event)
-        self.object.position.move_to(
-            new_position, self.object.width(), self.object.height()
-        )
-        self.object.draw()
-
-
-class LinearPositionScaling(WindowResizeHandler):
-    def __init__(self, game_object: GameObject):
-        super().__init__(game_object)
-
-    def get_new_position(self, event) -> Tuple[float, float]:
-        old_center_point_bounds = self.object.calculate_center_bounds(
-            *event.old_dimensions
-        )
-        position_percentage = self.object.calculate_position_percentage(
-            old_center_point_bounds
-        )
-        print("Was at", position_percentage)
-
-        # Update object's position to be the in the same place relative to the window size
-        new_center_point_bounds = self.object.calculate_center_bounds(event.w, event.h)
-        new_center = self.object.map_relative_position_to_box(
-            position_percentage, new_center_point_bounds
-        )
-        new_x = new_center[0] - self.object.width() / 2
-        new_y = new_center[1] - self.object.height() / 2
-
-        return new_x, new_y
-
 class FPSCounter(GameObject):
     def draw(self):
         self.texture.draw_at(self.position)
@@ -643,7 +558,7 @@ class FPSCounter(GameObject):
     def __init__(self, game: Game):
         self.game = game
         self.font = pygame.font.Font("freesansbold.ttf", 12)
-        self.spawn_point = lambda: PixelsPoint(object=self, x=0, y=0, relative_to=Corner.TOP_RIGHT)
+        self.spawn_point = lambda: PixelsPoint(x=0, y=0, relative_to=Corner.TOP_RIGHT)
         texture = TextTexture(game, self.get_content, self.font)
 
         super().__init__(texture=texture)
