@@ -309,19 +309,6 @@ class Game:
                 callback = self.key_up_callbacks[event.key]
                 callback()
 
-        # Touch input
-        elif event.type == pygame.FINGERDOWN:
-            target_point = PercentagePoint(event.x, event.y)
-            self.car.movement_targets[event.finger_id] = target_point
-        elif event.type == pygame.FINGERMOTION:
-            target_point = PercentagePoint(event.x, event.y)
-            self.car.movement_targets[event.finger_id] = target_point
-        elif event.type == pygame.FINGERUP:
-            try:
-                self.car.movement_targets.pop(event.finger_id)
-            except KeyError:
-                print(f"Ignoring keypress from #{event.finger_id} on #{event.touch_id}")
-
     def trigger_key_action(self, action: str, event: pygame.event.Event):
         if action not in self.key_action_callbacks:
             return
