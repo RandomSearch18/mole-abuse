@@ -66,8 +66,10 @@ class PointSpecifier:
         corner_to_x, corner_to_y = corner_to.value
         if corner_from is None:
             # Calculating from center
-            offset_x = (object_width / 2) * corner_to_x
-            offset_y = (object_height / 2) * corner_to_y
+            x_multiplier = 1 if corner_to_x == 1 else -1
+            y_multiplier = 1 if corner_to_y == 1 else -1
+            offset_x = (object_width / 2) * x_multiplier
+            offset_y = (object_height / 2) * y_multiplier
             return (offset_x, offset_y)
 
         corner_from_x, corner_from_y = corner_from.value
