@@ -639,7 +639,7 @@ class Mole(GameObject):
     def __init__(self, game: Game) -> None:
         self.game = game
         # Mole image adapted from the Mullvad VPN logo: https://mullvad.net/en/press
-        texture_image = pygame.image.load(Path("assets", "mole_64x.png"))
+        texture_image = pygame.image.load(Path("assets", "mole.svg"))
         texture = ImageTexture(game=game, image=texture_image)
         super().__init__(texture=texture)
 
