@@ -1,4 +1,5 @@
 from __future__ import annotations
+import random
 from typing import Callable, Optional, Tuple
 from collections import deque
 from enum import Enum
@@ -374,7 +375,7 @@ class Game:
         self.fps_counter = FPSCounter(game=self)
         self.objects.append(self.fps_counter)
 
-        self.current_mole = Mole(game=self, spawn_point=PercentagePoint(0.5, 0.5))
+        self.current_mole = Mole(game=self)
         self.objects.append(self.current_mole)
 
         while not self.exited:
@@ -625,9 +626,18 @@ class Mole(GameObject):
         )
         self.texture.draw_at(self.position)
 
-    def __init__(self, game: Game, spawn_point: PointSpecifier) -> None:
+    def generate_spawn_position(self, margin: float) -> int:
+        lower_bound = math.ceil(margin)
+        upper_bound = math.floor(self.game.width() - margin)
+        return random.randint(lower_bound, upper_bound)
+
+    def spawn_point(self) -> PointSpecifier:
+        x = self.generate_spawn_position(self.width() / 2)
+        y = self.generate_spawn_position(self.height() / 2)
+        return PixelsPoint(x, y)
+
+    def __init__(self, game: Game) -> None:
         self.game = game
-        self.spawn_point = lambda: spawn_point
         # Mole image adapted from the Mullvad VPN logo: https://mullvad.net/en/press
         texture_image = pygame.image.load(Path("assets", "mole_64x.png"))
         texture = ImageTexture(game=game, image=texture_image)
