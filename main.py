@@ -419,7 +419,7 @@ class Texture:
 
 
 class PlainColorTexture(Texture):
-    def __init__(self, game: Game, color: Tuple[int, int, int], width, height):
+    def __init__(self, game: Game, color: Color, width, height):
         self.game = game
         self.color = color
         super().__init__(width, height)
@@ -462,9 +462,9 @@ class TextTexture(Texture):
     def __init__(
         self,
         game: Game,
-        get_content: Callable[[], str | Tuple[str, Tuple[int, int, int]]],
+        get_content: Callable[[], str | Tuple[str, Color]],
         font: pygame.font.Font,
-        get_color: Optional[Callable[[], Tuple[int, int, int]]] = None,
+        get_color: Optional[Callable[[], Color]] = None,
     ):
         self.game = game
         self._get_content = get_content
@@ -606,7 +606,7 @@ class FPSCounter(GameObject):
             return color.YELLOW
         return color.FOREGROUND
 
-    def get_content(self) -> Tuple[str, Tuple[int, int, int]]:
+    def get_content(self) -> Tuple[str, Color]:
         fps = self.game.clock.get_fps()
         color = self.calculate_color(fps)
         return f"{fps:.0f} FPS", color
