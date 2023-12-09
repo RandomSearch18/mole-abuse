@@ -629,7 +629,7 @@ class Mole(GameObject):
         return random.randint(lower_bound, upper_bound)
 
     def spawn_point(self) -> PointSpecifier:
-        # print(self.width(), self.height())
+        print("Mole dimensions", self.width(), self.height())
         x = self.generate_spawn_position(self.game.width(), self.width() / 2)
         y = self.generate_spawn_position(self.game.height(), self.height() / 2)
         return PixelsPoint(x, y)
