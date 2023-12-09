@@ -620,20 +620,18 @@ class FPSCounter(GameObject):
 
 class Mole(GameObject):
     def draw(self):
-        print(
-            self.position.resolve(self.game),
-            self.position.calculate_top_left(self.game, self.width(), self.height()),
-        )
         self.texture.draw_at(self.position)
 
-    def generate_spawn_position(self, margin: float) -> int:
+    def generate_spawn_position(self, outer_size: float, margin: float) -> int:
         lower_bound = math.ceil(margin)
-        upper_bound = math.floor(self.game.width() - margin)
+        upper_bound = math.floor(outer_size - margin)
+        # print(f"Margin {margin}, range {lower_bound}..{upper_bound}")
         return random.randint(lower_bound, upper_bound)
 
     def spawn_point(self) -> PointSpecifier:
-        x = self.generate_spawn_position(self.width() / 2)
-        y = self.generate_spawn_position(self.height() / 2)
+        # print(self.width(), self.height())
+        x = self.generate_spawn_position(self.game.width(), self.width() / 2)
+        y = self.generate_spawn_position(self.game.height(), self.height() / 2)
         return PixelsPoint(x, y)
 
     def __init__(self, game: Game) -> None:
