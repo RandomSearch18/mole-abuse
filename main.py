@@ -31,6 +31,9 @@ class Corner(Enum):
 
 
 class PointSpecifier:
+    outer_corner: Corner
+    self_corner: Optional[Corner]
+
     def resolve(
         self, game: Game, width: float = 0, height: float = 0
     ) -> Tuple[float, float]:
@@ -52,26 +55,69 @@ class PointSpecifier:
         """Responds to a window resize event to keep the position within window bounds"""
         pass
 
+    def calculate_offest_to_corner(
+        self, object_width: float, object_height: float, corner_to: Corner
+    ) -> Tuple[float, float]:
+        corner_from = self.self_corner
+
+        if corner_from == corner_to:
+            return (0, 0)
+
+        corner_to_x, corner_to_y = corner_to.value
+        if corner_from is None:
+            # Calculating from center
+            offset_x = (object_width / 2) * corner_to_x
+            offset_y = (object_height / 2) * corner_to_y
+            return (offset_x, offset_y)
+
+        corner_from_x, corner_from_y = corner_from.value
+        x_multiplier = corner_to_x - corner_from_x
+        y_multiplier = corner_to_y - corner_from_y
+        offset_x = object_width * x_multiplier
+        offset_y = object_height * y_multiplier
+
+        return (offset_x, offset_y)
+
     def calculate_top_left(self, game: Game, object_width: float, object_height: float):
-        center_x, center_y = self.resolve(game)
-        offset_x = object_width / 2
-        offset_y = object_height / 2
-        top_left_x = center_x - offset_x
-        top_left_y = center_y - offset_y
+        return self.find_corner(Corner.TOP_LEFT, game, object_width, object_height)
+
+    def find_corner(
+        self, corner: Corner, game: Game, object_width: float, object_height: float
+    ):
+        x, y = self.resolve(game)
+        offset_x, offset_y = self.calculate_offest_to_corner(
+            object_width, object_height, corner
+        )
+        top_left_x = x + offset_x
+        top_left_y = y + offset_y
         return (top_left_x, top_left_y)
 
 
 class PixelsPoint(PointSpecifier):
-    def __init__(self, x: float, y: float, relative_to: Corner = Corner.TOP_LEFT):
+    def __init__(
+        self,
+        x: float,
+        y: float,
+        outer_corner: Corner = Corner.TOP_LEFT,
+        self_corner: Optional[Corner] = None,
+    ):
+        """Create a new pixel-based point specifier
+
+        @x: The number of pixels horizontally away from the outer corner that the point should be at
+        @y: The number of pixels vertically away from the outer corner that the point should be at
+        @outer_corner: The corner of the parent box (i.e. the game window) that the point is placed relative to
+        @self_corner: If this point represents an object's position, the corner of said object that this coordinate represents. \
+        Defaults to `None`, which means this point represents the object's centre (or isn't attached to any object).
+        """
         self.x = x
         self.y = y
-        self.relative_to = relative_to
-        self.object = object
+        self.outer_corner = outer_corner
+        self.self_corner = self_corner
 
     def resolve(self, game: Game) -> Tuple[float, float]:
         outer_width = game.window_box().width
         outer_height = game.window_box().height
-        multiplier_x, multiplier_y = self.relative_to.value
+        multiplier_x, multiplier_y = self.outer_corner.value
 
         # Coordinates of the window corner that we're working relative to
         base_x_coordinate = multiplier_x * outer_width
@@ -89,22 +135,22 @@ class PixelsPoint(PointSpecifier):
         return (actual_x_coordinate, actual_y_coordinate)
 
     def move_right(self, pixels: float):
-        x_corner = self.relative_to.value[0]
+        x_corner = self.outer_corner.value[0]
         pixel_movement = -pixels if x_corner else +pixels
         self.x += pixel_movement
 
     def move_left(self, pixels: float):
-        x_corner = self.relative_to.value[0]
+        x_corner = self.outer_corner.value[0]
         pixel_movement = +pixels if x_corner else -pixels
         self.x += pixel_movement
 
     def move_down(self, pixels: float):
-        y_corner = self.relative_to.value[1]
+        y_corner = self.outer_corner.value[1]
         pixel_movement = -pixels if y_corner else +pixels
         self.y += pixel_movement
 
     def move_up(self, pixels: float):
-        y_corner = self.relative_to.value[1]
+        y_corner = self.outer_corner.value[1]
         pixel_movement = +pixels if y_corner else -pixels
         self.y += pixel_movement
 
@@ -113,10 +159,17 @@ class PixelsPoint(PointSpecifier):
 
 
 class PercentagePoint(PointSpecifier):
-    def __init__(self, x: float, y: float, relative_to: Corner = Corner.TOP_LEFT):
+    def __init__(
+        self,
+        x: float,
+        y: float,
+        outer_corner: Corner = Corner.TOP_LEFT,
+        self_corner: Optional[Corner] = None,
+    ):
         self.x = x
         self.y = y
-        self.relative_to = relative_to
+        self.outer_corner = outer_corner
+        self.self_corner = self_corner
         self.object = object
 
     def resolve(
@@ -126,7 +179,9 @@ class PercentagePoint(PointSpecifier):
         x_pixels = self.x * outer_box.width
         y_pixels = self.y * outer_box.height
 
-        pixels_point = PixelsPoint(x_pixels, y_pixels, self.relative_to)
+        pixels_point = PixelsPoint(
+            x_pixels, y_pixels, self.outer_corner, self.self_corner
+        )
         return pixels_point.resolve(game)
 
     def on_window_resize(self, event):
@@ -539,10 +594,6 @@ class GameObject:
 
 class FPSCounter(GameObject):
     def draw(self):
-        print(
-            self.position.resolve(self.game),
-            self.position.calculate_top_left(self.game, self.width(), self.height()),
-        )
         self.texture.draw_at(self.position)
 
     def calculate_color(self, fps: float) -> pygame.Color:
@@ -561,7 +612,9 @@ class FPSCounter(GameObject):
     def __init__(self, game: Game):
         self.game = game
         self.font = pygame.font.Font("freesansbold.ttf", 12)
-        self.spawn_point = lambda: PixelsPoint(x=0, y=0, relative_to=Corner.TOP_RIGHT)
+        self.spawn_point = lambda: PixelsPoint(
+            x=0, y=0, outer_corner=Corner.TOP_RIGHT, self_corner=Corner.TOP_RIGHT
+        )
         texture = TextTexture(game, self.get_content, self.font)
 
         super().__init__(texture=texture)
@@ -577,6 +630,10 @@ class FPSCounter(GameObject):
 
 class Mole(GameObject):
     def draw(self):
+        print(
+            self.position.resolve(self.game),
+            self.position.calculate_top_left(self.game, self.width(), self.height()),
+        )
         self.texture.draw_at(self.position)
 
     def __init__(self, game: Game, spawn_point: PointSpecifier) -> None:
