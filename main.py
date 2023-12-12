@@ -387,6 +387,8 @@ class Game:
         pygame.display.update()
 
     def game_session(self):
+        self.score = 0
+        
         self.fps_counter = FPSCounter(game=self)
         self.objects.append(self.fps_counter)
 
@@ -650,13 +652,17 @@ class Mole(GameObject):
         y = self.generate_spawn_position(self.game.height(), self.height() / 2)
         return PixelsPoint(x, y)
 
+    def handle_whack(self, event: Event):
+        self.game.score += 1
+        print(self.game.score)
+    
     def __init__(self, game: Game) -> None:
         self.game = game
         # Mole image adapted from the Mullvad VPN logo: https://mullvad.net/en/press
         texture_image = pygame.image.load(Path("assets", "mole.svg"))
         texture = ImageTexture(game=game, image=texture_image)
         super().__init__(texture=texture)
-        self.on_click_tasks.append(print)
+        self.on_click_tasks.append(self.handle_whack)
 
 
 # Starts a session of the game in a window running at 60 fps
