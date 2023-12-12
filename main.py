@@ -239,6 +239,12 @@ class Box:
 
         return is_within_x and is_within_y
 
+    def intersects_with_point(self, coordinates: Tuple[float, float]):
+        other_x, other_y = coordinates
+        is_within_x = self.x1 <= other_x <= self.x2
+        is_within_y = self.y1 <= other_y <= self.y2
+        return is_within_x and is_within_y
+
     def is_outside(self, other_box: Box) -> bool:
         is_outside_x = self.right < other_box.left or self.left > other_box.right
 
@@ -309,6 +315,15 @@ class Game:
             if event.key in self.key_up_callbacks:
                 callback = self.key_up_callbacks[event.key]
                 callback()
+
+        # Mouse clicks
+        elif event.type == pygame.MOUSEBUTTONUP:
+            click_x, click_y = event.pos
+            for object in self.objects:
+                if object.collision_box().intersects_with_point(event.pos):
+                    # Run any on-click callbacks for the object
+                    for callback in object.on_click_tasks:
+                        callback(event)
 
     def trigger_key_action(self, action: str, event: pygame.event.Event):
         if action not in self.key_action_callbacks:
@@ -510,6 +525,7 @@ class GameObject:
         assert isinstance(self.game, Game)
         self.game: Game = self.game
         self.tick_tasks: list[Callable] = []
+        self.on_click_tasks: list[Callable[[Event], None]] = []
         self.texture = texture
         self.is_solid = solid
         self.reset()
@@ -640,6 +656,7 @@ class Mole(GameObject):
         texture_image = pygame.image.load(Path("assets", "mole.svg"))
         texture = ImageTexture(game=game, image=texture_image)
         super().__init__(texture=texture)
+        self.on_click_tasks.append(print)
 
 
 # Starts a session of the game in a window running at 60 fps
