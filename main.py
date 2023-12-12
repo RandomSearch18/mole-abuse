@@ -31,12 +31,19 @@ class Corner(Enum):
     BOTOM_RIGHT = (1, 1)
 
 
+class Edge(Enum):
+    TOP = (0, -1)
+    BOTTOM = (0, 1)
+    LEFT = (-1, 0)
+    RIGHT = (1, 0)
+
+
 class PointSpecifier:
     outer_corner: Corner
     self_corner: Optional[Corner]
 
     def resolve(
-        self, game: Game, width: float = 0, height: float = 0
+        self, game: Game
     ) -> Tuple[float, float]:
         raise NotImplementedError()
 
@@ -610,7 +617,20 @@ class GameObject:
         return self.collision_box().is_outside(window)
 
     def coordinates(self):
-        return self.position.resolve(self.game, self.width(), self.height())
+        return self.position.resolve(self.game)
+
+    def closest_window_edge(self) -> Edge:
+        outer_box = self.game.window_box()
+        our_x, our_y = self.coordinates()
+        distances = {
+            Edge.TOP: abs(outer_box.top - our_y),
+            Edge.BOTTOM: abs(outer_box.bottom - our_y),
+            Edge.LEFT: abs(outer_box.left - our_x),
+            Edge.RIGHT: abs(outer_box.right - our_x),
+        }
+        closest_edge = min(distances, key=distances.get)
+        return closest_edge
+        
 
 class Velocity:
     def on_tick(self):
@@ -713,8 +733,10 @@ class Mole(GameObject):
         if self.age() < self.max_age:
             return
 
-        # Start a death 'animation' by shoving the mole downwards
-        self.velocity.shove_y()        
+        # Start a death 'animation' by shoving the mole towards the nearest edge
+        target_edge_x, target_edge_y = self.closest_window_edge().value
+        self.velocity.shove_x(target_edge_x)
+        self.velocity.shove_y(target_edge_y)
 
     def check_if_offscreen(self):
         """Kill the mole if it goes offscreen, since its death animation has finished"""
@@ -725,7 +747,7 @@ class Mole(GameObject):
         # Reduce the score by 1 since the player missed this mole, haha take the L
         if self.game.score > 0:
             self.game.score -= 1
-    
+
     def __init__(self, game: Game) -> None:
         self.game = game
         # Mole image adapted from the Mullvad VPN logo: https://mullvad.net/en/press
