@@ -721,6 +721,10 @@ class Mole(GameObject):
         if not self.is_outside_window():
             return
         self.alive = False
+
+        # Reduce the score by 1 since the player missed this mole, haha take the L
+        if self.game.score > 0:
+            self.game.score -= 1
     
     def __init__(self, game: Game) -> None:
         self.game = game
