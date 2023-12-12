@@ -361,6 +361,12 @@ class Game:
         for event in pygame.event.get():
             self.on_event(event)
 
+        # Handle dead moles
+        if not self.current_mole.alive:
+            self.objects.remove(self.current_mole)
+            self.current_mole = Mole(game=self)
+            self.objects.append(self.current_mole)
+        
         # Update the objects
         if not self.is_paused:
             for object in self.objects:
@@ -391,6 +397,7 @@ class Game:
         
         self.fps_counter = FPSCounter(game=self)
         self.objects.append(self.fps_counter)
+        self.objects.append(ScoreCounter(game=self))
 
         self.current_mole = Mole(game=self)
         self.objects.append(self.current_mole)
@@ -635,6 +642,22 @@ class FPSCounter(GameObject):
 #     def init(self):
 #         self.memorized_frame_time = None
 
+class ScoreCounter(GameObject):
+    def draw(self):
+        self.texture.draw_at(self.position)
+
+    def get_content(self) -> str:
+        return f"Score: {self.game.score}"
+
+    def __init__(self, game: Game):
+        self.game = game
+        self.font = pygame.font.Font("freesansbold.ttf", 20)
+        self.spawn_point = lambda: PixelsPoint(
+            x=5, y=5, outer_corner=Corner.TOP_LEFT, self_corner=Corner.TOP_LEFT
+        )
+        texture = TextTexture(game, self.get_content, self.font)
+
+        super().__init__(texture=texture)
 
 class Mole(GameObject):
     def draw(self):
@@ -653,8 +676,8 @@ class Mole(GameObject):
         return PixelsPoint(x, y)
 
     def handle_whack(self, event: Event):
+        self.alive = False
         self.game.score += 1
-        print(self.game.score)
     
     def __init__(self, game: Game) -> None:
         self.game = game
@@ -663,6 +686,7 @@ class Mole(GameObject):
         texture = ImageTexture(game=game, image=texture_image)
         super().__init__(texture=texture)
         self.on_click_tasks.append(self.handle_whack)
+        self.alive = True
 
 
 # Starts a session of the game in a window running at 60 fps
