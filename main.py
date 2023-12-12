@@ -371,6 +371,7 @@ class Game:
         # Handle dead moles
         if not self.current_mole.alive:
             self.objects.remove(self.current_mole)
+            print("New mole!")
             self.current_mole = Mole(game=self)
             self.objects.append(self.current_mole)
         
@@ -740,6 +741,8 @@ class Mole(GameObject):
 
     def check_if_offscreen(self):
         """Kill the mole if it goes offscreen, since its death animation has finished"""
+        if self.is_birth_animation == True:
+            return
         if not self.is_outside_window():
             return
         self.alive = False
@@ -748,6 +751,29 @@ class Mole(GameObject):
         if self.game.score > 0:
             self.game.score -= 1
 
+    def set_pre_birth_positon(self):
+        target_edge = self.closest_window_edge()
+        if target_edge == Edge.LEFT:
+            self.position.x = 0 - self.width()
+        if target_edge == Edge.RIGHT:
+            self.position.x = self.game.width() + self.width()
+        if target_edge == Edge.TOP:
+            self.position.y = 0 - self.height()
+        if target_edge == Edge.BOTTOM:
+            self.position.y = self.game.height() + self.height()
+
+    def do_birth_animation(self):
+        # nearest_corner_x, nearest_corner_y = self.closest_window_edge().value
+        # if nearest_corner_x != 0:
+        #     if self.position.x == -1:
+        self.is_birth_animation = True
+        self.set_pre_birth_positon()
+        # Move onto the screen (towards the target edge) until it reaches its spawn point
+        target_edge_x, target_edge_y = self.closest_window_edge().value
+        self.velocity.shove_x(-target_edge_x)
+        self.velocity.shove_y(-target_edge_y)
+        print(self.position.x, self.position.y, "+ velocity", self.velocity.x, self.velocity.y)
+    
     def __init__(self, game: Game) -> None:
         self.game = game
         # Mole image adapted from the Mullvad VPN logo: https://mullvad.net/en/press
@@ -756,9 +782,11 @@ class Mole(GameObject):
         super().__init__(texture=texture)
         self.on_click_tasks.append(self.handle_whack)
         self.tick_tasks.extend([self.check_age, self.check_if_offscreen])
+        self.is_birth_animation = False
         self.alive = True
         self.max_age = 1.5 * 1000 # 1.5 seconds in ms
         self.velocity = Velocity(self, 20)
+        self.do_birth_animation()
 
 
 # Starts a session of the game in a window running at 60 fps
