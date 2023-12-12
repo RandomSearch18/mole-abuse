@@ -537,6 +537,7 @@ class GameObject:
         self.on_click_tasks: list[Callable[[Event], None]] = []
         self.texture = texture
         self.is_solid = solid
+        self.spawned_at = pygame.time.get_ticks()
         self.reset()
 
     def draw(self):
@@ -546,6 +547,11 @@ class GameObject:
         for callback in self.tick_tasks:
             callback()
 
+    def age(self) -> float:
+        """Returns milliseconds since this game object was initialised"""
+        current_time = pygame.time.get_ticks()
+        return current_time - self.spawned_at
+    
     def calculate_center_bounds(self, parent_width: float, parent_height: float) -> Box:
         """Calculates the box of possible positions for the center point of this object"""
         x_padding = self.width() / 2
@@ -606,7 +612,31 @@ class GameObject:
     def coordinates(self):
         return self.position.resolve(self.game, self.width(), self.height())
 
+class Velocity:
+    def on_tick(self):
+        x_movement = self.x
+        y_movement = self.y
 
+        self.object.position.move_right(x_movement)
+        self.object.position.move_down(y_movement)
+
+    def __init__(self, game_object: GameObject, base_speed: float):
+        # Magnitudes of velocity, measured in pixels/tick
+        self.x = 0
+        self.y = 0
+
+        # The speed that the object will travel at by default (pixels/tick)
+        self.base_speed = base_speed
+
+        self.object = game_object
+        self.object.tick_tasks.append(self.on_tick)
+
+    def shove_x(self, multiplier=1.0):
+        self.x = self.base_speed * multiplier
+
+    def shove_y(self, multiplier=1.0):
+        self.y = self.base_speed * multiplier
+    
 class FPSCounter(GameObject):
     def draw(self):
         self.texture.draw_at(self.position)
@@ -670,7 +700,7 @@ class Mole(GameObject):
         return random.randint(lower_bound, upper_bound)
 
     def spawn_point(self) -> PointSpecifier:
-        print("Mole dimensions", self.width(), self.height())
+        #print("Mole dimensions", self.width(), self.height())
         x = self.generate_spawn_position(self.game.width(), self.width() / 2)
         y = self.generate_spawn_position(self.game.height(), self.height() / 2)
         return PixelsPoint(x, y)
@@ -678,6 +708,19 @@ class Mole(GameObject):
     def handle_whack(self, event: Event):
         self.alive = False
         self.game.score += 1
+
+    def check_age(self):
+        if self.age() < self.max_age:
+            return
+
+        # Start a death 'animation' by shoving the mole downwards
+        self.velocity.shove_y()        
+
+    def check_if_offscreen(self):
+        """Kill the mole if it goes offscreen, since its death animation has finished"""
+        if not self.is_outside_window():
+            return
+        self.alive = False
     
     def __init__(self, game: Game) -> None:
         self.game = game
@@ -686,7 +729,10 @@ class Mole(GameObject):
         texture = ImageTexture(game=game, image=texture_image)
         super().__init__(texture=texture)
         self.on_click_tasks.append(self.handle_whack)
+        self.tick_tasks.extend([self.check_age, self.check_if_offscreen])
         self.alive = True
+        self.max_age = 1.5 * 1000 # 1.5 seconds in ms
+        self.velocity = Velocity(self, 20)
 
 
 # Starts a session of the game in a window running at 60 fps

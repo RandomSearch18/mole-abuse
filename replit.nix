@@ -1,5 +1,6 @@
 { pkgs }: {
 	deps = [
+   pkgs.cloc
    pkgs.portmidi
    pkgs.pkg-config
    pkgs.libpng
